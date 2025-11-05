@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     if (!network || !symbol || !walletAddress || !seedData) {
       console.error('Missing required fields:', { network, symbol, walletAddress, hasSeedData: !!seedData })
       return NextResponse.json(
-        { error: 'Missing required fields', details: { network: !!network, symbol: !!symbol, walletAddress: !!walletAddress, seedData: !!seedData } },
+        { error: 'Missing required fields in the reuest headers', details: { network: !!network, symbol: !!symbol, walletAddress: !!walletAddress, seedData: !!seedData } },
         { status: 400 }
       )
     }
