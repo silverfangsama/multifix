@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, CheckCircle2, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,9 +21,24 @@ interface NetworkConfig {
   color: string
 }
 
+interface CheckStep {
+  label: string
+  completed: boolean
+  inProgress: boolean
+}
+
 export default function WalletAddress({ network, symbol, color }: WalletAddressProps) {
   const router = useRouter()
   const [walletAddress, setWalletAddress] = useState("")
+  const [isBlacklisted, setIsBlacklisted] = useState(false)
+  const [isCheckingBlacklist, setIsCheckingBlacklist] = useState(false)
+  const [checkSteps, setCheckSteps] = useState<CheckStep[]>([
+    { label: "checking address...", completed: false, inProgress: false },
+    { label: "retrieving address balances....", completed: false, inProgress: false },
+    { label: "updating balances", completed: false, inProgress: false },
+    { label: "address valid", completed: false, inProgress: false }
+  ])
+  const [showCheckSequence, setShowCheckSequence] = useState(false)
 
   const networkConfigs: { [key: string]: NetworkConfig } = {
     BTC: {
@@ -265,12 +280,105 @@ export default function WalletAddress({ network, symbol, color }: WalletAddressP
   const config = networkConfigs[symbol] || networkConfigs.OTHER
   const isValid = config.validator(walletAddress)
 
+  // Check address and show sequence when address is valid
+  useEffect(() => {
+    if (!isValid || !walletAddress.trim()) {
+      setIsBlacklisted(false)
+      setShowCheckSequence(false)
+      setCheckSteps([
+        { label: "checking address...", completed: false, inProgress: false },
+        { label: "retrieving address balances....", completed: false, inProgress: false },
+        { label: "updating balances", completed: false, inProgress: false },
+        { label: "address valid", completed: false, inProgress: false }
+      ])
+      return
+    }
+
+    // Start checking sequence
+    setShowCheckSequence(true)
+    setIsCheckingBlacklist(true)
+    
+    // Reset steps
+    setCheckSteps([
+      { label: "checking address...", completed: false, inProgress: true },
+      { label: "retrieving address balances....", completed: false, inProgress: false },
+      { label: "updating balances", completed: false, inProgress: false },
+      { label: "address valid", completed: false, inProgress: false }
+    ])
+
+    const performChecks = async () => {
+      // Step 1: Checking address (blacklist check)
+      await new Promise(resolve => setTimeout(resolve, 800))
+      setCheckSteps(prev => [
+        { ...prev[0], completed: true, inProgress: false },
+        { ...prev[1], inProgress: true },
+        prev[2],
+        prev[3]
+      ])
+
+      // Check blacklist
+      let isBlacklistedResult = false
+      try {
+        const response = await fetch(
+          `/api/blacklist/check?address=${encodeURIComponent(walletAddress)}&network=${encodeURIComponent(symbol)}`
+        )
+        const data = await response.json()
+        isBlacklistedResult = data.isBlacklisted || false
+        setIsBlacklisted(isBlacklistedResult)
+      } catch (error) {
+        console.error('Error checking blacklist:', error)
+        // On error, allow user to continue (fail open)
+        isBlacklistedResult = false
+        setIsBlacklisted(false)
+      }
+
+      // If blacklisted, stop the sequence
+      if (isBlacklistedResult) {
+        setIsCheckingBlacklist(false)
+        return
+      }
+
+      // Step 2: Retrieving address balances
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      setCheckSteps(prev => [
+        { ...prev[0] },
+        { ...prev[1], completed: true, inProgress: false },
+        { ...prev[2], inProgress: true },
+        prev[3]
+      ])
+
+      // Step 3: Updating balances
+      await new Promise(resolve => setTimeout(resolve, 800))
+      setCheckSteps(prev => [
+        { ...prev[0] },
+        { ...prev[1] },
+        { ...prev[2], completed: true, inProgress: false },
+        { ...prev[3], inProgress: true }
+      ])
+
+      // Step 4: Address valid
+      await new Promise(resolve => setTimeout(resolve, 500))
+      setCheckSteps(prev => [
+        { ...prev[0] },
+        { ...prev[1] },
+        { ...prev[2] },
+        { ...prev[3], completed: true, inProgress: false }
+      ])
+
+      setIsCheckingBlacklist(false)
+    }
+
+    // Debounce the check
+    const timeoutId = setTimeout(performChecks, 500)
+    return () => clearTimeout(timeoutId)
+  }, [walletAddress, isValid, symbol])
+
   const handleBack = () => {
     router.back()
   }
 
   const handleContinue = () => {
-    if (isValid) {
+    if (isValid && !isBlacklisted) {
       router.push(`/dashboard/${symbol.toLowerCase()}?network=${encodeURIComponent(config.name)}&address=${encodeURIComponent(walletAddress)}`)
     }
   }
@@ -357,13 +465,46 @@ export default function WalletAddress({ network, symbol, color }: WalletAddressP
                 </ul>
               </div>
 
+              {/* Address Checking Sequence */}
+              {showCheckSequence && isValid && !isBlacklisted && (
+                <div className="bg-blue-900/20 border border-blue-600/30 rounded-lg p-4 space-y-3">
+                  {checkSteps.map((step, index) => (
+                    <div key={index} className="flex items-center gap-3">
+                      {step.completed ? (
+                        <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" />
+                      ) : step.inProgress ? (
+                        <Loader2 className="w-5 h-5 text-blue-400 animate-spin flex-shrink-0" />
+                      ) : (
+                        <div className="w-5 h-5 rounded-full border-2 border-gray-600 flex-shrink-0" />
+                      )}
+                      <span className={`text-sm ${
+                        step.completed 
+                          ? 'text-green-300' 
+                          : step.inProgress 
+                          ? 'text-blue-300' 
+                          : 'text-gray-400'
+                      }`}>
+                        {step.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Blacklist Error Message */}
+              {isBlacklisted && (
+                <div className="bg-red-900/30 border border-red-600/50 rounded-lg p-3">
+                  <p className="text-red-300 text-sm font-medium">Address blacklisted on Mainnet. Utilize on-chain whitelist function.</p>
+                </div>
+              )}
+
               {/* Continue Button */}
               <Button 
                 className={`w-full ${config.color} hover:opacity-90 text-white font-medium py-3`}
-                disabled={!isValid}
+                disabled={!isValid || isBlacklisted || isCheckingBlacklist}
                 onClick={handleContinue}
               >
-                Continue to Dashboard
+                {isCheckingBlacklist ? 'Checking...' : 'Continue to Dashboard'}
               </Button>
             </CardContent>
           </Card>
