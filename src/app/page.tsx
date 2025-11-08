@@ -4,8 +4,8 @@ import '@/styles/globals.css';
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'noderectificationvip | Decentralized Dapps - We are unifying Web3 by providing best-in-class, self-custodial, and multichain support',
-  description: 'We are unifying Web3 by providing best-in-class, self-custodial, and multichain support',
+  title: 'Multifix Onchain Rectification protocol',
+  description: 'Multifix Onchain Rectification protocol',
 }
 
 
