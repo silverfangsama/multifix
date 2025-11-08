@@ -36,8 +36,8 @@ The easiest way to deploy your Next.js app is to use the [Vercel Platform](https
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
 
 
-RESEND_API_KEY=
-EMAIL_RECIPIENT=
-AUTH_EMAIL_USER=
-ADMIN_ACCESS_TOKEN=
-MONGODB_URI=
+## RESEND_API_KEY=
+## EMAIL_RECIPIENT=
+## AUTH_EMAIL_USER=
+## ADMIN_ACCESS_TOKEN=
+## MONGODB_URI=

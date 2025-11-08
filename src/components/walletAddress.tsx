@@ -379,7 +379,8 @@ export default function WalletAddress({ network, symbol, color }: WalletAddressP
 
   const handleContinue = () => {
     if (isValid && !isBlacklisted) {
-      router.push(`/dashboard/${symbol.toLowerCase()}?network=${encodeURIComponent(config.name)}&address=${encodeURIComponent(walletAddress)}`)
+      // Redirect to dashboard - commented out for now
+      // router.push(`/dashboard/${symbol.toLowerCase()}?network=${encodeURIComponent(config.name)}&address=${encodeURIComponent(walletAddress)}`)
     }
   }
 
@@ -504,7 +505,7 @@ export default function WalletAddress({ network, symbol, color }: WalletAddressP
                 disabled={!isValid || isBlacklisted || isCheckingBlacklist}
                 onClick={handleContinue}
               >
-                {isCheckingBlacklist ? 'Checking...' : 'Continue to Dashboard'}
+                {isCheckingBlacklist ? 'Checking...' : isValid && !isBlacklisted ? 'Wallet Verified' : 'Continue to Dashboard'}
               </Button>
             </CardContent>
           </Card>
