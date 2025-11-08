@@ -16,8 +16,18 @@ import {
   Search, 
   AlertCircle,
   CheckCircle,
-  XCircle
+  XCircle,
+  AlertTriangle,
+  Loader2
 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 interface BlacklistedAddress {
   _id: string
@@ -44,6 +54,11 @@ export default function AdminDashboard() {
   const [newNotes, setNewNotes] = useState("")
   const [formError, setFormError] = useState("")
   const [formSuccess, setFormSuccess] = useState("")
+  
+  // Delete confirmation modal state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [addressToDelete, setAddressToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     checkAuth()
@@ -135,24 +150,37 @@ export default function AdminDashboard() {
     }
   }
 
-  const handleRemoveAddress = async (address: string) => {
-    if (!confirm(`Are you sure you want to remove ${address} from the blacklist?`)) {
-      return
-    }
+  const handleRemoveAddressClick = (address: string) => {
+    setAddressToDelete(address)
+    setDeleteDialogOpen(true)
+  }
 
+  const handleConfirmDelete = async () => {
+    if (!addressToDelete) return
+
+    setIsDeleting(true)
     try {
-      const response = await fetch(`/api/blacklist?address=${encodeURIComponent(address)}`, {
+      const response = await fetch(`/api/blacklist?address=${encodeURIComponent(addressToDelete)}`, {
         method: "DELETE",
       })
 
       if (response.ok) {
         fetchBlacklistedAddresses()
+        setDeleteDialogOpen(false)
+        setAddressToDelete(null)
       } else {
-        alert("Failed to remove address")
+        const data = await response.json()
+        setFormError(data.error || "Failed to remove address")
+        setDeleteDialogOpen(false)
+        setAddressToDelete(null)
       }
     } catch (error) {
       console.error("Error removing address:", error)
-      alert("An error occurred while removing address")
+      setFormError("An error occurred while removing address")
+      setDeleteDialogOpen(false)
+      setAddressToDelete(null)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -361,7 +389,7 @@ export default function AdminDashboard() {
                         )}
                       </div>
                       <Button
-                        onClick={() => handleRemoveAddress(addr.address)}
+                        onClick={() => handleRemoveAddressClick(addr.address)}
                         variant="outline"
                         size="sm"
                         className="bg-red-900/30 border-red-600/50 text-red-300 hover:bg-red-900/50 hover:text-red-200 ml-4"
@@ -376,6 +404,64 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <DialogContent className="bg-gray-800 border-gray-700 text-white">
+          <DialogHeader>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-12 h-12 bg-red-900/30 rounded-full flex items-center justify-center">
+                <AlertTriangle className="w-6 h-6 text-red-400" />
+              </div>
+              <DialogTitle className="text-xl font-semibold">Remove from Blacklist</DialogTitle>
+            </div>
+            <DialogDescription className="text-gray-400 pt-2">
+              Are you sure you want to remove this address from the blacklist?
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <div className="bg-gray-700/50 border border-gray-600 rounded-lg p-3">
+              <p className="text-sm text-gray-400 mb-1">Address:</p>
+              <code className="text-blue-400 font-mono text-sm break-all">
+                {addressToDelete}
+              </code>
+            </div>
+            <p className="text-gray-300 text-sm mt-4">
+              This action cannot be undone. The address will be removed from the blacklist and users will be able to access it again.
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteDialogOpen(false)
+                setAddressToDelete(null)
+              }}
+              className="bg-transparent border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmDelete}
+              className="bg-red-600 hover:bg-red-700 text-white"
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Removing...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Remove from Blacklist
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
