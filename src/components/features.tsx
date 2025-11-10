@@ -268,11 +268,11 @@ export default function Component() {
       <div className="container mx-auto px-4 py-16">
         <div className="text-center mb-16">
         <h4 className="text-2xl font-bold text-white">           
-            Multi Update API
+            Multichain Review RPC
         </h4><br></br>
 
           <p className="text-gray-100 text-sm md:text-lg max-w-2xl mx-auto mb-6 leading-relaxed">
-          Connect to multiple blockchain networks and manage your crypto assets securely
+          Securely review your crypto assets using onchain RPCs
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-16">
