@@ -267,9 +267,9 @@ export default function Component() {
       {/* Main Content */}
       <div className="container mx-auto px-4 py-16">
         <div className="text-center mb-16">
-        <h className="text-5xl font-bold text-white">           
+        <h4 className="text-2xl font-bold text-white">           
             Multi Update API
-        </h1><br></br>
+        </h4><br></br>
 
           <p className="text-gray-100 text-sm md:text-lg max-w-2xl mx-auto mb-6 leading-relaxed">
           Connect to multiple blockchain networks and manage your crypto assets securely
